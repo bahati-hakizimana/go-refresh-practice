@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/go-refresh-practice/go-refresh-course/config"
 	"github.com/go-refresh-practice/go-refresh-course/service/auth"
 	"github.com/go-refresh-practice/go-refresh-course/types"
 	"github.com/go-refresh-practice/go-refresh-course/utils"
@@ -28,6 +29,43 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 }
 
 func (h *Handler) handlerLogin(w http.ResponseWriter, r *http.Request) {
+
+	var payload types.LoginUserPayload
+	if err := utils.PulseJson(r, &payload); err != nil {
+
+		utils.WriteError(w, http.StatusBadRequest, err)
+
+		return
+
+	}
+
+	if err := utils.Validate.Struct(payload); err != nil{
+		errors := err.(validator.ValidationErrors)
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("Invalid payload %v", errors))
+		return
+	}
+
+	u, err := h.store.GetUserByEmail(payload.Email)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("user not invalid email or password"))
+		return
+	}
+
+	if !auth.ComparePassword(u.Password, []byte(payload.Password)) {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("User not found, invalid Email or Password"))
+		return
+	}
+    secret := []byte(config.Envs.JWTSecret)
+	token, err := auth.CreateJwt(secret, u.ID)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]string{"token": token})
+
+
+
+
 
 }
 

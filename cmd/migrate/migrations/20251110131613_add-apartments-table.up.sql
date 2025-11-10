@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS apartments(
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(255) NOT NULL,
+    `name` VARCHAR(255) NOT NULL,
+    `rooms` INT NOT NULL,
+    `description` TEXT NOT NULL,
+    `price` DECIMAL(10,2) NOT NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(`id`)
+);
