@@ -7,12 +7,13 @@ import (
 	"github.com/go-refresh-practice/go-refresh-course/cmd/api"
 	"github.com/go-refresh-practice/go-refresh-course/config"
 	"github.com/go-refresh-practice/go-refresh-course/db"
+	"github.com/go-refresh-practice/go-refresh-course/service/seed"
 	"github.com/go-sql-driver/mysql"
 )
 
 func main() {
 
-	db, err := db.NewMySQLStorage(mysql.Config{
+	 dbConn, err := db.NewMySQLStorage(mysql.Config{
 
 		User:        config.Envs.DBUser,
 		Passwd:    config.Envs.DBPassword,
@@ -27,9 +28,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-		initStorage(db)
+		initStorage( dbConn)
+		seed.SeedAdmin( dbConn)
 	
-	server := api.NewAPIServer(":8080", db)
+	server := api.NewAPIServer(":8080",  dbConn)
 	if err := server.Run(); err !=nil {
 		log.Fatal(err);
 	}

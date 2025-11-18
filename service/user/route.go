@@ -56,12 +56,12 @@ func (h *Handler) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
     secret := []byte(config.Envs.JWTSecret)
-	token, err := auth.CreateJwt(secret, u.ID)
+	token, err := auth.CreateJwt(secret, u.ID, u.Email, u.Role)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 	}
 
-	utils.WriteJson(w, http.StatusOK, map[string]string{"token": token})
+	utils.WriteJson(w, http.StatusOK, map[string]string{"token": token, "email": u.Email, "firstName": u.FirstName, "lastName": u.LastName, "role": u.Role})
 
 
 

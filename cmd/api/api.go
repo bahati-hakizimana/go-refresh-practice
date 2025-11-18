@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-refresh-practice/go-refresh-course/service/aprtment"
 	"github.com/go-refresh-practice/go-refresh-course/service/user"
 	"github.com/gorilla/mux"
 )
@@ -28,6 +29,9 @@ func (s *APIServer) Run() error {
 	userStore := user.NewStore(s.db)
 	userHandler := user.NewHandler(userStore)
 	userHandler.RegisterRoutes(subrouter)
+	apartmentStore := aprtment.NewStore(s.db)
+	apartmentHandler := aprtment.NewHandler(apartmentStore) 
+	apartmentHandler.RegisterRoutes(subrouter)
 	log.Println("Listen on", s.addr)
 	return http.ListenAndServe(s.addr, router)
 }
