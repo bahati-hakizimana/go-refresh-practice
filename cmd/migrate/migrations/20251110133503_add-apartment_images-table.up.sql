@@ -1,10 +1,13 @@
 CREATE TABLE IF NOT EXISTS apartment_images (
-    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `apartment_id` INT UNSIGNED NOT NULL,
-    `image_url` VARCHAR(255) NOT NULL,
-    `caption` VARCHAR(255) DEFAULT NULL,
-    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY(`id`),
-    FOREIGN KEY(`apartment_id`) REFERENCES apartments(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB;
+    id SERIAL PRIMARY KEY,
+    apartment_id INT NOT NULL,
+    image_url VARCHAR(255) NOT NULL,
+    caption VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_apartment
+        FOREIGN KEY(apartment_id)
+        REFERENCES apartments(id)
+        ON DELETE CASCADE
+);
+
 

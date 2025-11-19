@@ -20,6 +20,19 @@ type Apartment struct {
 
 }
 
+type ApartmentImagesStore interface{
+	GetImagesByApartmentID(apartmentID int) ([]ApartmentImage, error)
+	AddImageToApartment(apartmentID int, imageURL string) (ApartmentImage, error)
+}
+
+type ApartmentImage struct {
+	ID          int       `json:"id"`
+	ApartmentID int       `json:"apartmentId"`
+	ImageURL    string    `json:"imageUrl"`
+	Caption    string     `json:"caption"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 type UserStore interface{
 	GetUserByEmail(email string) (*User, error)
 	GetUserById(id int) (*User, error)

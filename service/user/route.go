@@ -3,6 +3,7 @@ package user
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/go-refresh-practice/go-refresh-course/config"
@@ -47,7 +48,7 @@ func (h *Handler) handlerLogin(w http.ResponseWriter, r *http.Request) {
 
 	u, err := h.store.GetUserByEmail(payload.Email)
 	if err != nil {
-		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("user not invalid email or password"))
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid email or password"))
 		return
 	}
 
@@ -79,6 +80,9 @@ func (h *Handler) handlerRegister(w http.ResponseWriter, r *http.Request){
 		return
 
 	}
+
+	// Trim email to avoid accidental space
+	payload.Email = strings.TrimSpace(payload.Email)
 	// check if user exists
 
 	_,err := h.store.GetUserByEmail(payload.Email)
@@ -88,7 +92,6 @@ func (h *Handler) handlerRegister(w http.ResponseWriter, r *http.Request){
 	}
 
 
-	// if not exist we craete new user
 
 	// validate
 	 if err := utils.Validate.Struct(payload); err != nil {
@@ -97,21 +100,43 @@ func (h *Handler) handlerRegister(w http.ResponseWriter, r *http.Request){
 		return
 	 }
 
-	hashedPassword, err  := auth.HashPassword(payload.Password)
+	//  Hash password
 
-	 err = h.store.CreateUser(types.User{
+	hashedPassword, err  := auth.HashPassword(payload.Password)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("Failed to hash password %v", err))
+		return
+	}
+
+	// Create user
+
+	user:= types.User{
+
 		FirstName: payload.FirstName,
 		LastName: payload.LastName,
 		Email: payload.Email,
 		Password: hashedPassword,
-	})
+		Role: "user",
 
+	}
+	
+	 err = h.store.CreateUser(user)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	utils.WriteJson(w, http.StatusCreated, nil)
+	// Return response
+
+	response := map[string]interface{}{
+		"message": "User registered successfully",
+		"email":   user.Email,
+		"firstName": user.FirstName,
+		"lastName": user.LastName,
+
+	}
+
+	utils.WriteJson(w, http.StatusCreated, response)
 
 
 }

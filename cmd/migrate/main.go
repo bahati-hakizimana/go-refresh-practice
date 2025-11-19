@@ -1,61 +1,64 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/go-refresh-practice/go-refresh-course/config"
 	"github.com/go-refresh-practice/go-refresh-course/db"
-	mysqlCfg "github.com/go-sql-driver/mysql"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/mysql"
-	_"github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-
-
 func main() {
-	db, err := db.NewMySQLStorage(mysqlCfg.Config{
 
-		User:        config.Envs.DBUser,
-		Passwd:    config.Envs.DBPassword,
-		Addr:        config.Envs.DBAddress,
-		DBName:       config.Envs.DBName,
-		Net:         "tcp",
-		AllowNativePasswords: true,
-		ParseTime:   true,
-	})
-		
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-    driver, err := mysql.WithInstance(db, &mysql.Config{})
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://cmd/migrate/migrations",
-		"mysql",
-		driver,
+	// Build DSN from your config
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s/%s?sslmode=disable",
+		config.Envs.DBUser,
+		config.Envs.DBPassword,
+		config.Envs.DBAddress,
+		config.Envs.DBName,
 	)
 
+	// Connect using existing helper
+	dbConn, err := db.NewPostgresStorage(dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	cmd := os.Args[(len(os.Args) -1)]
+	// Migration driver for Postgres
+	driver, err := postgres.WithInstance(dbConn, &postgres.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create migration instance
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://cmd/migrate/migrations",
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// "up" or "down" command
+	cmd := os.Args[len(os.Args)-1]
 
 	if cmd == "up" {
-		if err := m.Up(); err != nil && err != migrate.ErrNoChange{
+		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 			log.Fatal(err)
 		}
 	}
+
 	if cmd == "down" {
-		if err := m.Down(); err != nil && err != migrate.ErrNoChange{
+		if err := m.Down(); err != nil && err != migrate.ErrNoChange {
 			log.Fatal(err)
 		}
 	}

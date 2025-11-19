@@ -1,21 +1,34 @@
+
+CREATE TYPE booking_status_enum AS ENUM (
+    'pending',
+    'confirmed',
+    'checked_in',
+    'cancelled'
+    
+);
+
 CREATE TABLE IF NOT EXISTS bookings (
-    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `apartment_id` INT UNSIGNED NOT NULL,
-    `firstName` VARCHAR(255) NOT NULL,
-    `lastName` VARCHAR(255) NOT NULL,
-    `email` VARCHAR(255) NOT NULL,
-    `phoneNumber` VARCHAR(255) NOT NULL,
-    `checkin_date` DATE NOT NULL,
-    `checkout_date` DATE NOT NULL,
-    `guest_number` INT NOT NULL,
-    `total_price` DECIMAL(12, 2) NOT NULL,
-    `booking_amount` DECIMAL(12, 2) NOT NULL,
-    `balance_amount` DECIMAL(12, 2) NOT NULL,
-    `currency` VARCHAR(10) DEFAULT 'USD',
-    `booking_status` ENUM('pending','confirmed','checked_in','completed','cancelled','no_show') DEFAULT 'pending',
-    `payment_status` ENUM('pending','partial_paid','paid','refunded') DEFAULT 'pending',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY(`id`),
-    FOREIGN KEY (`apartment_id`) REFERENCES apartments(`id`) ON DELETE CASCADE
-)ENGINE=InnoDB;
+    id SERIAL PRIMARY KEY,
+    apartment_id INT NOT NULL,
+    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone_number VARCHAR(255) NOT NULL,
+    checkin_date DATE NOT NULL,
+    checkout_date DATE NOT NULL,
+    guest_number INT NOT NULL,
+    total_price NUMERIC(12,2) NOT NULL,
+    booking_amount NUMERIC(12,2) NOT NULL,
+    balance_amount NUMERIC(12,2) NOT NULL,
+    currency VARCHAR(10) DEFAULT 'USD',
+    booking_status booking_status_enum DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_apartment FOREIGN KEY (apartment_id)
+        REFERENCES apartments(id)
+        ON DELETE CASCADE
+);
+
+
+

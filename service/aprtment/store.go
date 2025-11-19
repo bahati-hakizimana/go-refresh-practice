@@ -35,22 +35,18 @@ func (s *Store) GetApartments() ([]types.Apartment, error) {
 
 
 func (s *Store) CreateApartment(ap types.Apartment) (types.Apartment, error) {
-	// assuming `id` is AUTO_INCREMENT and `created_at` has DEFAULT CURRENT_TIMESTAMP
-	res, err := s.db.Exec(`
-		INSERT INTO apartments (code, name, rooms, description, price)
-		VALUES (?, ?, ?, ?, ?)
-	`, ap.Code, ap.Name, ap.Rooms, ap.Description, ap.Price)
-	if err != nil {
-		return types.Apartment{}, err
-	}
+    // Insert into Postgres and return the generated ID
+    err := s.db.QueryRow(`
+        INSERT INTO apartments (code, name, rooms, description, price)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+    `, ap.Code, ap.Name, ap.Rooms, ap.Description, ap.Price).Scan(&ap.ID)
 
-	id, err := res.LastInsertId()
-	if err == nil {
-		// adjust type if your ID is int, int64, etc
-		ap.ID = int(id)
-	}
+    if err != nil {
+        return types.Apartment{}, err
+    }
 
-	return ap, nil
+    return ap, nil
 }
 
 func scanRowsIntoApartment(rows *sql.Rows) (*types.Apartment, error) {
