@@ -2,6 +2,7 @@ package aprtment
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/go-refresh-practice/go-refresh-course/types"
 )
@@ -15,7 +16,7 @@ func NewStore(db *sql.DB) *Store {
 }
 
 func (s *Store) GetApartments() ([]types.Apartment, error) {
-	rows, err := s.db.Query("SELECT * FROM apartments")
+	rows, err := s.db.Query("SELECT id, code, name, rooms, description, price, status, created_at FROM apartments")
 	if err != nil {
 		return  nil, err
 	}
@@ -32,6 +33,30 @@ func (s *Store) GetApartments() ([]types.Apartment, error) {
 
 	return apartments, nil
 }
+
+func(s *Store) GetApartmentByCode(code string) (*types.Apartment, error){
+	rows, err := s.db.Query("SELECT id, code, name, rooms, description, price, status, created_at FROM apartments WHERE code = $1", code)
+
+	if err != nil {
+		return nil, err
+	}
+
+	apt := new(types.Apartment)
+	for rows.Next(){
+		apt, err = scanRowsIntoApartment(rows)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if apt.ID == 0 {
+		return  nil, fmt.Errorf("Apartment not found")
+	}
+
+	return apt, nil
+}
+
 
 
 func (s *Store) CreateApartment(ap types.Apartment) (types.Apartment, error) {
@@ -55,11 +80,12 @@ func scanRowsIntoApartment(rows *sql.Rows) (*types.Apartment, error) {
 	err := rows.Scan(
 
 		&apartment.ID,
-		&apartment.Name,
 		&apartment.Code,
+		&apartment.Name,
 		&apartment.Rooms,
 		&apartment.Description,
 		&apartment.Price,
+		&apartment.Status,
 		&apartment.CreatedAt,
 
 	)

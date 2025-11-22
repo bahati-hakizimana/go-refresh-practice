@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-refresh-practice/go-refresh-course/service/apartmentimage"
 	"github.com/go-refresh-practice/go-refresh-course/service/aprtment"
 	"github.com/go-refresh-practice/go-refresh-course/service/user"
 	"github.com/gorilla/mux"
@@ -32,6 +33,10 @@ func (s *APIServer) Run() error {
 	apartmentStore := aprtment.NewStore(s.db)
 	apartmentHandler := aprtment.NewHandler(apartmentStore) 
 	apartmentHandler.RegisterRoutes(subrouter)
+	apartmentImagesStore := apartmentimage.NewStore(s.db)
+	apartmentImagesHandler := apartmentimage.NewHandler(apartmentImagesStore)
+	apartmentImagesHandler.RegisterImageRoutes(subrouter)
+
 	log.Println("Listen on", s.addr)
 	return http.ListenAndServe(s.addr, router)
 }
