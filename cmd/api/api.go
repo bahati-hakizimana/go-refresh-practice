@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-refresh-practice/go-refresh-course/service/apartmentimage"
 	"github.com/go-refresh-practice/go-refresh-course/service/aprtment"
+	"github.com/go-refresh-practice/go-refresh-course/service/booking"
+	"github.com/go-refresh-practice/go-refresh-course/service/payments"
 	"github.com/go-refresh-practice/go-refresh-course/service/user"
 	"github.com/gorilla/mux"
 )
@@ -36,6 +38,12 @@ func (s *APIServer) Run() error {
 	apartmentImagesStore := apartmentimage.NewStore(s.db)
 	apartmentImagesHandler := apartmentimage.NewHandler(apartmentImagesStore)
 	apartmentImagesHandler.RegisterImageRoutes(subrouter)
+	bookingStore:= booking.NewStore(s.db)
+	bookingHandler := booking.NewHandler(bookingStore)
+	bookingHandler.RegisterRoutes(subrouter)
+	paymentStore := payments.NewStore(s.db)
+	paymentHandler := payments.NewHandler(paymentStore)
+	paymentHandler.RegisterRoutes(subrouter)
 
 	log.Println("Listen on", s.addr)
 	return http.ListenAndServe(s.addr, router)

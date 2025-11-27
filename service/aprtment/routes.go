@@ -46,6 +46,8 @@ func(h *Handler) handleGetApartments(w http.ResponseWriter, r *http.Request){
 }
 
 func (h *Handler) handlerCreateApartment(w http.ResponseWriter, r *http.Request) {
+
+	
 	var payload types.CreateApartmentPayload
 	if err := utils.PulseJson(r, &payload); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, err)

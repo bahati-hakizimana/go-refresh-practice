@@ -7,6 +7,7 @@ toolchain go1.24.10
 require github.com/go-sql-driver/mysql v1.9.3
 
 require (
+	github.com/PuerkitoBio/rehttp v1.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.10 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
