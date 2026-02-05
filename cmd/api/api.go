@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-refresh-practice/go-refresh-course/config"
 	"github.com/go-refresh-practice/go-refresh-course/service/apartmentimage"
 	"github.com/go-refresh-practice/go-refresh-course/service/aprtment"
 	"github.com/go-refresh-practice/go-refresh-course/service/booking"
@@ -15,34 +16,47 @@ import (
 
 type APIServer struct {
 	addr string
-	db *sql.DB
+	db   *sql.DB
 }
 
 func NewAPIServer(addr string, db *sql.DB) *APIServer {
-	 return &APIServer{
+	return &APIServer{
 		addr: addr,
-		db: db,
-	 }
+		db:   db,
+	}
 }
 
 func (s *APIServer) Run() error {
 	router := mux.NewRouter()
-	subrouter := router.PathPrefix("/api/v1",).Subrouter()
+	subrouter := router.PathPrefix("/api/v1").Subrouter()
 
+	// User routes
 	userStore := user.NewStore(s.db)
 	userHandler := user.NewHandler(userStore)
 	userHandler.RegisterRoutes(subrouter)
+
+	// Apartment routes
 	apartmentStore := aprtment.NewStore(s.db)
-	apartmentHandler := aprtment.NewHandler(apartmentStore) 
+	apartmentHandler := aprtment.NewHandler(apartmentStore)
 	apartmentHandler.RegisterRoutes(subrouter)
+
+	// Apartment images routes
 	apartmentImagesStore := apartmentimage.NewStore(s.db)
 	apartmentImagesHandler := apartmentimage.NewHandler(apartmentImagesStore)
 	apartmentImagesHandler.RegisterImageRoutes(subrouter)
-	bookingStore:= booking.NewStore(s.db)
+
+	// Booking routes
+	bookingStore := booking.NewStore(s.db)
 	bookingHandler := booking.NewHandler(bookingStore)
 	bookingHandler.RegisterRoutes(subrouter)
+
+	// Payment routes with Pasis integration
 	paymentStore := payments.NewStore(s.db)
-	paymentHandler := payments.NewHandler(paymentStore)
+	pasisClient := payments.NewPasisClient(
+		config.Envs.PasisAppKey,
+		config.Envs.PasisSecretKey,
+	)
+	paymentHandler := payments.NewHandler(paymentStore, pasisClient)
 	paymentHandler.RegisterRoutes(subrouter)
 
 	log.Println("Listen on", s.addr)

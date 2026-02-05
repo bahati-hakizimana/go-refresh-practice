@@ -46,6 +46,8 @@ github.com/leodido/go-urn v1.4.0/go.mod h1:bvxc+MVxLKB4z00jd1z+Dvzr47oO32F/QSNjS
 github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
 github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
 github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32/go.mod h1:9wM+0iRr9ahx58uYLpLIr5fm8diHn0JbqRycJi6w0Ms=
+github.com/pasisltd/go-sdk v0.0.6 h1:gbLrV9A2cHgLBUCTkNw19U75L/hWwhBgGD7Ug0oPdmc=
+github.com/pasisltd/go-sdk v0.0.6/go.mod h1:+ufuBnV3ueLZyF77bnkI8PCcMRQ64PzxwemyU3XxM5A=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/quarksgroup/paypack-go v0.2.9 h1:um+E5Ir8TbDcShYAtM/tabogTqg7L4V2z5U+GECbBOY=
 github.com/quarksgroup/paypack-go v0.2.9/go.mod h1:sI3pef1+jBI1PgvSjQJXdBVYmQPgNg6ySh+dKfn6hxQ=

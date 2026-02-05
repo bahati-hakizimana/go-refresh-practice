@@ -1,91 +1,133 @@
 package payments
 
 import (
-	"context"
+	// "database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
-	"github.com/go-refresh-practice/go-refresh-course/middleware"
 	"github.com/go-refresh-practice/go-refresh-course/types"
 	"github.com/go-refresh-practice/go-refresh-course/utils"
 	"github.com/gorilla/mux"
-
-	// "github.com/quarksgroup/paypack-go"
-	// "github.com/quarksgroup/paypack-go/api"
-	// "github.com/quarksgroup/paypack-go/oauth"
-	"github.com/quarksgroup/paypack-go/paypack"
-	"github.com/quarksgroup/paypack-go/paypack/api"
-	"github.com/quarksgroup/paypack-go/paypack/transport/oauth"
 )
 
 type Handler struct {
-	store   types.PaymentStore
-	paypack *paypack.Client
+	store        *Store
+	pasisClient  *PasisClient
 }
 
-func NewHandler(store types.PaymentStore) *Handler {
-	cli := api.NewDefault()
-	cli.Http = &http.Client{
-		Transport: &oauth.Transport{
-			Scheme: oauth.SchemeBearer,
-			Source: oauth.ContextTokenSource(),
-			Base:   http.DefaultTransport,
-		},
-	}
-
+func NewHandler(store *Store, pasisClient *PasisClient) *Handler {
 	return &Handler{
-		store:   store,
-		paypack: cli,
+		store:       store,
+		pasisClient: pasisClient,
 	}
 }
 
 func (h *Handler) RegisterRoutes(router *mux.Router) {
-
-	router.Handle("/payments",
-		middleware.AuthMiddleware(
-			middleware.AdminOnly(
-				http.HandlerFunc(h.handlerGetPayments),
-			)),
-	).Methods(http.MethodGet)
-
-	router.Handle("/payments",
-		http.HandlerFunc(h.handlerCreatePayment),
-	).Methods(http.MethodPost)
+	router.HandleFunc("/payments", h.handleCreatePayment).Methods("POST")
+	router.HandleFunc("/payments", h.handleGetPayments).Methods("GET")
+	router.HandleFunc("/payments/{id}", h.handleGetPaymentByID).Methods("GET")
+	router.HandleFunc("/payments/{id}/status", h.handleCheckPaymentStatus).Methods("GET")
+	router.HandleFunc("/payments/wallet/balance", h.handleGetWalletBalance).Methods("GET")
 }
 
-/* ------------------ Paypack Cashin Helper --------------------- */
+/* ------------------ CREATE PAYMENT --------------------- */
 
-type PaypackTxReq struct {
-	Amount float64
-	Phone  string
-	Mode   string
+type CreatePaymentRequest struct {
+	BookingID     int    `json:"booking_id"`
+	Amount        string `json:"amount"`
+	Currency      string `json:"currency"`
+	PaymentMethod string `json:"payment_method"` // e.g., "mobile_money", "card", "bank_transfer"
+	PhoneNumber   string `json:"phone_number"`
+	Region        string `json:"region"` // e.g., "RW", "US"
 }
 
-func (h *Handler) Cashin(ctx context.Context, tx PaypackTxReq, accessToken string) (*paypack.TransactionResponse, error) {
-
-	ctx = context.WithValue(ctx, paypack.TokenKey{}, &paypack.Token{
-		Access: accessToken,
-	})
-
-	req := &paypack.TransactionRequest{
-		Amount: tx.Amount,
-		Phone:  tx.Phone,
-		Mode:   tx.Mode,
+func (h *Handler) handleCreatePayment(w http.ResponseWriter, r *http.Request) {
+	var req CreatePaymentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid request payload"))
+		return
 	}
 
-	res, err := h.paypack.Transaction.Cashin(ctx, req)
+	// Validate required fields
+	if req.BookingID == 0 || req.Amount == "" || req.Currency == "" || req.PaymentMethod == "" {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("missing required fields"))
+		return
+	}
+
+	// Convert amount string to float64
+	amount, err := strconv.ParseFloat(req.Amount, 64)
 	if err != nil {
-		return nil, fmt.Errorf("cashin error: %w", err)
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid amount format"))
+		return
 	}
 
-	return res, nil
+	// Initiate payment with Pasis
+	ctx := r.Context()
+	
+	depositParams := DepositParams{
+		Amount:      req.Amount,
+		Currency:    req.Currency,
+		Provider:    req.PaymentMethod,
+		Region:      req.Region,
+		PhoneNumber: req.PhoneNumber,
+		Metadata: map[string]string{
+			"booking_id": strconv.Itoa(req.BookingID),
+			"source":     "apartment_booking",
+		},
+	}
+
+	transaction, err := h.pasisClient.InitiateDeposit(ctx, depositParams)
+	if err != nil {
+		// Check if it's an authentication or validation error based on the error message
+		errMsg := strings.ToLower(err.Error())
+		if strings.Contains(errMsg, "authentication") || strings.Contains(errMsg, "unauthorized") {
+			utils.WriteError(w, http.StatusUnauthorized, fmt.Errorf("payment gateway authentication failed"))
+			return
+		}
+		if strings.Contains(errMsg, "validation") || strings.Contains(errMsg, "invalid") {
+			utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid payment details: %v", err))
+			return
+		}
+
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to process payment: %v", err))
+		return
+	}
+
+	// Create payment record in database
+	payment := types.Payment{
+		BookingID:            req.BookingID,
+		PaymentType:          "deposit",
+		Amount:               amount,                // Now a float64
+		Currency:             req.Currency,
+		PaymentStatus:        transaction.Status,    // "pending", "completed", "failed"
+		PaymentMethod:        req.PaymentMethod,
+		TransactionReference: transaction.ID,
+		PaidAt:               time.Time{},           // Zero time.Time (will be updated when confirmed)
+	}
+
+	createdPayment, err := h.store.CreatePayment(payment)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Return payment details with transaction info
+	response := map[string]interface{}{
+		"payment":     createdPayment,
+		"transaction": transaction,
+		"message":     "Payment initiated successfully",
+	}
+
+	utils.WriteJson(w, http.StatusCreated, response)  // Fixed: WriteJson not WriteJSON
 }
 
 /* ------------------ GET ALL PAYMENTS --------------------- */
 
-func (h *Handler) handlerGetPayments(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetPayments(w http.ResponseWriter, r *http.Request) {
 	payments, err := h.store.GetPayments()
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
@@ -95,75 +137,89 @@ func (h *Handler) handlerGetPayments(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJson(w, http.StatusOK, payments)
 }
 
-/* ------------------ CREATE PAYMENT --------------------- */
+/* ------------------ GET PAYMENT BY ID --------------------- */
 
-func (h *Handler) handlerCreatePayment(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetPaymentByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
 
-	var payload types.PaymentPayload
-
-	if err := utils.PulseJson(r, &payload); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := utils.Validate.Struct(payload); err != nil {
-		error := err.(validator.ValidationErrors)
-		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid payload %v", error))
-		return
-	}
-
-	// Parse date
-	layout := "2006-01-02"
-	paidAt, err := time.Parse(layout, payload.PaidAt)
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid paidAt date format"))
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid payment ID"))
 		return
 	}
 
-	// User must send phone in query or you fetch phone from booking
-	phone := r.URL.Query().Get("phone")
-	if phone == "" {
-		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("phone is required for payment"))
-		return
-	}
-
-	// For now we allow dev testing —
-	accessToken := "YOUR_PAYPACK_ACCESS_TOKEN"
-
-	tx := PaypackTxReq{
-		Amount: payload.Amount,
-		Phone:  phone,
-		Mode:   "development",
-	}
-
-	payRes, err := h.Cashin(r.Context(), tx, accessToken)
+	payment, err := h.store.GetPaymentByID(id)
 	if err != nil {
-		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("payment failed: %v", err))
+		utils.WriteError(w, http.StatusNotFound, err)
 		return
 	}
 
-	payment := types.Payment{
-		BookingID:            payload.BookingID,
-		PaymentType:          payload.PaymentType,
-		Amount:               payload.Amount,
-		Currency:             payload.Currency,
-		PaymentMethod:        payload.PaymentMethod,
-		PaymentStatus:        payRes.Status,
-		TransactionReference: payRes.Ref,
-		PaidAt:               paidAt,
-	}
+	utils.WriteJson(w, http.StatusOK, payment)
+}
 
-	createdPayment, err := h.store.CreatePayment(payment)
+/* ------------------ CHECK PAYMENT STATUS --------------------- */
+
+func (h *Handler) handleCheckPaymentStatus(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, err)
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid payment ID"))
 		return
+	}
+
+	// Get payment from database
+	payment, err := h.store.GetPaymentByID(id)
+	if err != nil {
+		utils.WriteError(w, http.StatusNotFound, err)
+		return
+	}
+
+	// Check status with Pasis
+	ctx := r.Context()
+	transaction, err := h.pasisClient.GetTransactionStatus(ctx, payment.TransactionReference)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to check payment status"))
+		return
+	}
+
+	// Update payment status if changed
+	if transaction.Status != payment.PaymentStatus {
+		payment.PaymentStatus = transaction.Status
+		
+		// If payment is completed, set paid_at timestamp
+		if transaction.Status == "completed" && payment.PaidAt.IsZero() {
+			payment.PaidAt = time.Now()
+			
+			// Update in database
+			err = h.store.UpdatePaymentStatus(id, transaction.Status, payment.PaidAt)
+			if err != nil {
+				utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to update payment status"))
+				return
+			}
+		}
 	}
 
 	response := map[string]interface{}{
-		"message": "Payment initiated successfully",
-		"payment": createdPayment,
-		"paypack": payRes,
+		"payment":     payment,
+		"transaction": transaction,
 	}
 
-	utils.WriteJson(w, http.StatusCreated, response)
+	utils.WriteJson(w, http.StatusOK, response)
+}
+
+/* ------------------ GET WALLET BALANCE --------------------- */
+
+func (h *Handler) handleGetWalletBalance(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	wallet, err := h.pasisClient.GetWalletBalance(ctx)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed to get wallet balance"))
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, wallet)
 }

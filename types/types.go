@@ -96,9 +96,6 @@ type BookingPayload struct {
 }
 
 
-// End of booking struct and interface
-
-
 
 // payment struct and interface
 
@@ -113,12 +110,12 @@ type Payment struct {
 	ID                   int       `json:"id"`
 	BookingID            int       `json:"booking_id"`
 	PaymentType          string    `json:"payment_type"`
-	Amount               float64   `json:"amount"`
+	Amount               float64   `json:"amount"`         
 	Currency             string    `json:"currency"`
 	PaymentStatus        string    `json:"payment_status"`
 	PaymentMethod        string    `json:"payment_method"`
 	TransactionReference string    `json:"transaction_reference"`
-	PaidAt               time.Time `json:"paid_at"`
+	PaidAt               time.Time `json:"paid_at"`        
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }

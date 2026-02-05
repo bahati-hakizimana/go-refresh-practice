@@ -1,7 +1,8 @@
+// Add these to your config/env.go file
+
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
@@ -9,14 +10,18 @@ import (
 )
 
 type Config struct {
-	PublicHost              string
-	Port                    string
-	DBUser                  string
-	DBPassword              string
-	DBAddress               string
-	DBName                  string
-	JWTExpirationInSeconds  int64
-	JWTSecret               string
+	PublicHost             string
+	Port                   string
+	DBUser                 string
+	DBPassword             string
+	DBAddress              string
+	DBName                 string
+	JWTExpirationInSeconds int64
+	JWTSecret              string
+	
+	// Pasis Payment Gateway Configuration
+	PasisAppKey    string
+	PasisSecretKey string
 }
 
 var Envs = initConfig()
@@ -25,17 +30,18 @@ func initConfig() Config {
 	godotenv.Load()
 
 	return Config{
-		PublicHost: getEnv("PUBLIC_HOST", "http://localhost"),
-		Port:       getEnv("PORT", "8080"),
-
-		// PostgreSQL defaults
-		DBUser:     getEnv("DB_USER", "postgres"),
-		DBPassword: getEnv("DB_PASSWORD", "bahati"),
-		DBAddress:  fmt.Sprintf("%s:%s", getEnv("DB_HOST", "127.0.0.1"), getEnv("DB_PORT", "5432")),
-		DBName:     getEnv("DB_NAME", "claire_apartDb"),
-
-		JWTSecret:              getEnv("JWT_SECRET", "not-secret-secret-anymore?"),
-		JWTExpirationInSeconds: getEnvAsInt("JWT_EXP", 3600*24*7),
+		PublicHost:             getEnv("PUBLIC_HOST", "http://localhost"),
+		Port:                   getEnv("PORT", "8080"),
+		DBUser:                 getEnv("DB_USER", "root"),
+		DBPassword:             getEnv("DB_PASSWORD", "mypassword"),
+		DBAddress:              getEnv("DB_ADDRESS", "localhost:5432"),
+		DBName:                 getEnv("DB_NAME", "apartmentdb"),
+		JWTExpirationInSeconds: getEnvAsInt("JWT_EXPIRATION_IN_SECONDS", 3600*24*7),
+		JWTSecret:              getEnv("JWT_SECRET", "not-so-secret-now-is-it?"),
+		
+		// Pasis Configuration
+		PasisAppKey:    getEnv("PASIS_APP_KEY", ""),
+		PasisSecretKey: getEnv("PASIS_SECRET_KEY", ""),
 	}
 }
 
@@ -43,6 +49,7 @@ func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
 	}
+
 	return fallback
 }
 
@@ -52,7 +59,9 @@ func getEnvAsInt(key string, fallback int64) int64 {
 		if err != nil {
 			return fallback
 		}
+
 		return i
 	}
+
 	return fallback
 }
