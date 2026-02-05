@@ -17,14 +17,21 @@ import (
 
 func main() {
 
-	// Build DSN from your config
-	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s/%s?sslmode=disable",
-		config.Envs.DBUser,
-		config.Envs.DBPassword,
-		config.Envs.DBAddress,
-		config.Envs.DBName,
-	)
+	// PRIORITY 1: Check for DATABASE_URL (Fly.io sets this automatically)
+	dsn := os.Getenv("DATABASE_URL")
+	
+	// PRIORITY 2: Fallback to building DSN from config (local development)
+	if dsn == "" {
+		dsn = fmt.Sprintf(
+			"postgres://%s:%s@%s/%s?sslmode=disable",
+			config.Envs.DBUser,
+			config.Envs.DBPassword,
+			config.Envs.DBAddress,
+			config.Envs.DBName,
+		)
+	}
+
+	log.Println("Connecting to database for migrations...")
 
 	// Connect using existing helper
 	dbConn, err := db.NewPostgresStorage(dsn)
@@ -55,11 +62,13 @@ func main() {
 		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 			log.Fatal(err)
 		}
+		log.Println("✅ Migrations applied successfully!")
 	}
 
 	if cmd == "down" {
 		if err := m.Down(); err != nil && err != migrate.ErrNoChange {
 			log.Fatal(err)
 		}
+		log.Println("✅ Migrations rolled back successfully!")
 	}
 }

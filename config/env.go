@@ -1,8 +1,8 @@
-// Add these to your config/env.go file
 
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
@@ -14,8 +14,10 @@ type Config struct {
 	Port                   string
 	DBUser                 string
 	DBPassword             string
-	DBAddress              string
+	DBHost                 string
+	DBPort                 string
 	DBName                 string
+	DBAddress              string // Computed from DBHost:DBPort
 	JWTExpirationInSeconds int64
 	JWTSecret              string
 	
@@ -27,14 +29,20 @@ type Config struct {
 var Envs = initConfig()
 
 func initConfig() Config {
+	// Load .env file (won't exist on Fly.io, which is fine)
 	godotenv.Load()
 
+	dbHost := getEnv("DB_HOST", "127.0.0.1")
+	dbPort := getEnv("DB_PORT", "5432")
+	
 	return Config{
 		PublicHost:             getEnv("PUBLIC_HOST", "http://localhost"),
 		Port:                   getEnv("PORT", "8080"),
-		DBUser:                 getEnv("DB_USER", "root"),
-		DBPassword:             getEnv("DB_PASSWORD", "mypassword"),
-		DBAddress:              getEnv("DB_ADDRESS", "localhost:5432"),
+		DBUser:                 getEnv("DB_USER", "postgres"),
+		DBPassword:             getEnv("DB_PASSWORD", ""),
+		DBHost:                 dbHost,
+		DBPort:                 dbPort,
+		DBAddress:              fmt.Sprintf("%s:%s", dbHost, dbPort), // Combine for backward compatibility
 		DBName:                 getEnv("DB_NAME", "apartmentdb"),
 		JWTExpirationInSeconds: getEnvAsInt("JWT_EXPIRATION_IN_SECONDS", 3600*24*7),
 		JWTSecret:              getEnv("JWT_SECRET", "not-so-secret-now-is-it?"),

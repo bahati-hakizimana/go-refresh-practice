@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/go-refresh-practice/go-refresh-course/cmd/api"
 	"github.com/go-refresh-practice/go-refresh-course/config"
@@ -15,14 +16,21 @@ import (
 
 func main() {
 
-	// Build PostgreSQL DSN from your config
-	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s/%s?sslmode=disable",
-		config.Envs.DBUser,
-		config.Envs.DBPassword,
-		config.Envs.DBAddress, // already host:port
-		config.Envs.DBName,
-	)
+	// PRIORITY 1: Check for DATABASE_URL (Fly.io sets this automatically)
+	dsn := os.Getenv("DATABASE_URL")
+	
+	// PRIORITY 2: Fallback to building DSN from config (local development)
+	if dsn == "" {
+		dsn = fmt.Sprintf(
+			"postgres://%s:%s@%s/%s?sslmode=disable",
+			config.Envs.DBUser,
+			config.Envs.DBPassword,
+			config.Envs.DBAddress, // already host:port
+			config.Envs.DBName,
+		)
+	}
+
+	log.Println("Connecting to database...")
 
 	dbConn, err := db.NewPostgresStorage(dsn)
 	if err != nil {
