@@ -123,7 +123,7 @@ func (h *Handler) handleAddApartmentImage(w http.ResponseWriter, r *http.Request
     // Save in database
     img := types.ApartmentImage{
         ApartmentID: apartmentID,
-        ImageURL:    "/uploads/" + header.Filename, // path or public URL
+        ImageURL:    "/uploads/" + header.Filename,
         Caption:     caption,
     }
 

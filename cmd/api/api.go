@@ -12,6 +12,7 @@ import (
 	"github.com/go-refresh-practice/go-refresh-course/service/payments"
 	"github.com/go-refresh-practice/go-refresh-course/service/user"
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 )
 
 type APIServer struct {
@@ -59,6 +60,17 @@ func (s *APIServer) Run() error {
 	paymentHandler := payments.NewHandler(paymentStore, pasisClient)
 	paymentHandler.RegisterRoutes(subrouter)
 
+	// Configure CORS - Allow all origins
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		AllowCredentials: false,
+	})
+
+	// Wrap router with CORS middleware
+	handler := c.Handler(router)
+
 	log.Println("Listen on", s.addr)
-	return http.ListenAndServe(s.addr, router)
+	return http.ListenAndServe(s.addr, handler)
 }

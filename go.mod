@@ -22,6 +22,7 @@ require (
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/pasisltd/go-sdk v0.0.6 // indirect
 	github.com/quarksgroup/paypack-go v0.2.9 // indirect
+	github.com/rs/cors v1.11.1 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
