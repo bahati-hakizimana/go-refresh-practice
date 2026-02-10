@@ -2,7 +2,9 @@ package payments
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 
 	"github.com/pasisltd/go-sdk"
 )
@@ -92,6 +94,33 @@ func (pc *PasisClient) InitiateDeposit(ctx context.Context, params DepositParams
 
 	pasisTxn, err := pc.client.Deposit(ctx, depositReq)
 	if err != nil {
+		// Check for authentication errors
+		var authErr *pasis.AuthError
+		if errors.As(err, &authErr) {
+			log.Printf("Pasis Authentication Error: %v", authErr)
+			return nil, fmt.Errorf("authentication failed: %w", authErr)
+		}
+		
+		// Check for validation errors
+		var valErr *pasis.ValidationError
+		if errors.As(err, &valErr) {
+			log.Printf("Pasis Validation Error: %v", valErr)
+			return nil, fmt.Errorf("validation failed: %w", valErr)
+		}
+		
+		// Check for API errors
+		var apiErr *pasis.APIError
+		if errors.As(err, &apiErr) {
+			log.Printf("Pasis API Error (status %d): %s", apiErr.StatusCode, apiErr.Message)
+			if len(apiErr.Errors) > 0 {
+				for _, e := range apiErr.Errors {
+					log.Printf("  - %s", e)
+				}
+			}
+			return nil, fmt.Errorf("API error: %w", apiErr)
+		}
+
+		log.Printf("Pasis Unknown Error: %v", err)
 		return nil, fmt.Errorf("failed to initiate deposit: %w", err)
 	}
 
@@ -121,6 +150,33 @@ func (pc *PasisClient) InitiateWithdraw(ctx context.Context, params WithdrawPara
 
 	pasisTxn, err := pc.client.Withdraw(ctx, withdrawReq)
 	if err != nil {
+		// Check for authentication errors
+		var authErr *pasis.AuthError
+		if errors.As(err, &authErr) {
+			log.Printf("Pasis Authentication Error: %v", authErr)
+			return nil, fmt.Errorf("authentication failed: %w", authErr)
+		}
+		
+		// Check for validation errors
+		var valErr *pasis.ValidationError
+		if errors.As(err, &valErr) {
+			log.Printf("Pasis Validation Error: %v", valErr)
+			return nil, fmt.Errorf("validation failed: %w", valErr)
+		}
+		
+		// Check for API errors
+		var apiErr *pasis.APIError
+		if errors.As(err, &apiErr) {
+			log.Printf("Pasis API Error (status %d): %s", apiErr.StatusCode, apiErr.Message)
+			if len(apiErr.Errors) > 0 {
+				for _, e := range apiErr.Errors {
+					log.Printf("  - %s", e)
+				}
+			}
+			return nil, fmt.Errorf("API error: %w", apiErr)
+		}
+
+		log.Printf("Pasis Unknown Error: %v", err)
 		return nil, fmt.Errorf("failed to initiate withdrawal: %w", err)
 	}
 
@@ -141,13 +197,28 @@ func (pc *PasisClient) InitiateWithdraw(ctx context.Context, params WithdrawPara
 func (pc *PasisClient) GetTransactionStatus(ctx context.Context, transactionID string) (*Transaction, error) {
 	pasisTxn, err := pc.client.GetTransaction(ctx, transactionID)
 	if err != nil {
+		// Check for authentication errors
+		var authErr *pasis.AuthError
+		if errors.As(err, &authErr) {
+			log.Printf("Pasis Authentication Error: %v", authErr)
+			return nil, fmt.Errorf("authentication failed: %w", authErr)
+		}
+		
+		// Check for API errors
+		var apiErr *pasis.APIError
+		if errors.As(err, &apiErr) {
+			log.Printf("Pasis API Error (status %d): %s", apiErr.StatusCode, apiErr.Message)
+			return nil, fmt.Errorf("API error: %w", apiErr)
+		}
+
+		log.Printf("Pasis Unknown Error: %v", err)
 		return nil, fmt.Errorf("failed to get transaction status: %w", err)
 	}
 
 	// Convert Pasis transaction to our Transaction type
 	transaction := &Transaction{
 		ID:       pasisTxn.ID,
-		Status:   string(pasisTxn.Status),   // Convert TransactionStatus to string
+		Status:   string(pasisTxn.Status),   
 		Amount:   pasisTxn.Amount,
 		Currency: pasisTxn.Currency,
 		Type:     string(pasisTxn.Type),     // Convert TransactionType to string
@@ -161,6 +232,21 @@ func (pc *PasisClient) GetTransactionStatus(ctx context.Context, transactionID s
 func (pc *PasisClient) GetWalletBalance(ctx context.Context) (*Wallet, error) {
 	pasisWallet, err := pc.client.GetWallet(ctx)
 	if err != nil {
+		// Check for authentication errors
+		var authErr *pasis.AuthError
+		if errors.As(err, &authErr) {
+			log.Printf("Pasis Authentication Error: %v", authErr)
+			return nil, fmt.Errorf("authentication failed: %w", authErr)
+		}
+		
+		// Check for API errors
+		var apiErr *pasis.APIError
+		if errors.As(err, &apiErr) {
+			log.Printf("Pasis API Error (status %d): %s", apiErr.StatusCode, apiErr.Message)
+			return nil, fmt.Errorf("API error: %w", apiErr)
+		}
+
+		log.Printf("Pasis Unknown Error: %v", err)
 		return nil, fmt.Errorf("failed to get wallet balance: %w", err)
 	}
 
@@ -169,7 +255,7 @@ func (pc *PasisClient) GetWalletBalance(ctx context.Context) (*Wallet, error) {
 		ID:               pasisWallet.ID,
 		Balance:          pasisWallet.Balance,
 		Currency:         pasisWallet.Currency,
-		AvailableBalance: pasisWallet.Balance, // Use balance if AvailableBalance not present
+		AvailableBalance: pasisWallet.Balance, 
 	}
 
 	return wallet, nil
@@ -179,6 +265,21 @@ func (pc *PasisClient) GetWalletBalance(ctx context.Context) (*Wallet, error) {
 func (pc *PasisClient) ListTransactions(ctx context.Context, page, pageSize int) (*TransactionList, error) {
 	pasisList, err := pc.client.ListTransactions(ctx, page, pageSize)
 	if err != nil {
+		// Check for authentication errors
+		var authErr *pasis.AuthError
+		if errors.As(err, &authErr) {
+			log.Printf("Pasis Authentication Error: %v", authErr)
+			return nil, fmt.Errorf("authentication failed: %w", authErr)
+		}
+		
+		// Check for API errors
+		var apiErr *pasis.APIError
+		if errors.As(err, &apiErr) {
+			log.Printf("Pasis API Error (status %d): %s", apiErr.StatusCode, apiErr.Message)
+			return nil, fmt.Errorf("API error: %w", apiErr)
+		}
+
+		log.Printf("Pasis Unknown Error: %v", err)
 		return nil, fmt.Errorf("failed to list transactions: %w", err)
 	}
 
@@ -209,6 +310,21 @@ func (pc *PasisClient) ListTransactions(ctx context.Context, page, pageSize int)
 func (pc *PasisClient) GetMerchantProfile(ctx context.Context) (*MerchantProfile, error) {
 	pasisProfile, err := pc.client.GetMerchantProfile(ctx)
 	if err != nil {
+		// Check for authentication errors
+		var authErr *pasis.AuthError
+		if errors.As(err, &authErr) {
+			log.Printf("Pasis Authentication Error: %v", authErr)
+			return nil, fmt.Errorf("authentication failed: %w", authErr)
+		}
+		
+		// Check for API errors
+		var apiErr *pasis.APIError
+		if errors.As(err, &apiErr) {
+			log.Printf("Pasis API Error (status %d): %s", apiErr.StatusCode, apiErr.Message)
+			return nil, fmt.Errorf("API error: %w", apiErr)
+		}
+
+		log.Printf("Pasis Unknown Error: %v", err)
 		return nil, fmt.Errorf("failed to get merchant profile: %w", err)
 	}
 

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-refresh-practice/go-refresh-course/middleware"
 	"github.com/go-refresh-practice/go-refresh-course/types"
@@ -84,6 +86,13 @@ func (h *Handler) handleAddApartmentImage(w http.ResponseWriter, r *http.Request
 
     // Get apartment ID
     apartmentIDStr := r.FormValue("apartmentId")
+    apartmentIDStr = strings.TrimSpace(apartmentIDStr)
+    
+    if apartmentIDStr == "" {
+        utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId is required"))
+        return
+    }
+    
     apartmentID, err := strconv.Atoi(apartmentIDStr)
     if err != nil {
         utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId must be an integer"))
@@ -91,22 +100,30 @@ func (h *Handler) handleAddApartmentImage(w http.ResponseWriter, r *http.Request
     }
 
     // Get file from form-data
-    file, header, err := r.FormFile("imageFile") // <-- FormData key
+    file, header, err := r.FormFile("imageFile")
     if err != nil {
         utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("image file is required"))
         return
     }
     defer file.Close()
 
-    // Optional: Get caption
+    // Get caption
     caption := r.FormValue("caption")
     if caption == "" {
         utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("caption is required"))
         return
     }
 
-    // Save file locally (or upload to S3)
-    dst := "./uploads/" + header.Filename
+    // Sanitize filename - replace spaces and special characters with underscores
+    sanitizedFilename := strings.ReplaceAll(header.Filename, " ", "_")
+    sanitizedFilename = strings.ReplaceAll(sanitizedFilename, "%", "")
+    
+    // Add timestamp to make filename unique and avoid conflicts
+    timestamp := time.Now().Unix()
+    sanitizedFilename = fmt.Sprintf("%d_%s", timestamp, sanitizedFilename)
+
+    // Save file locally
+    dst := "./uploads/" + sanitizedFilename
     out, err := os.Create(dst)
     if err != nil {
         utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("unable to save file"))
@@ -120,10 +137,10 @@ func (h *Handler) handleAddApartmentImage(w http.ResponseWriter, r *http.Request
         return
     }
 
-    // Save in database
+    // Save in database with sanitized filename
     img := types.ApartmentImage{
         ApartmentID: apartmentID,
-        ImageURL:    "/uploads/" + header.Filename,
+        ImageURL:    "/uploads/" + sanitizedFilename,
         Caption:     caption,
     }
 
@@ -135,6 +152,3 @@ func (h *Handler) handleAddApartmentImage(w http.ResponseWriter, r *http.Request
 
     utils.WriteJson(w, http.StatusCreated, newImage)
 }
-
-
-

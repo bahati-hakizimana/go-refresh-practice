@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-refresh-practice/go-refresh-course/config"
 	"github.com/go-refresh-practice/go-refresh-course/service/apartmentimage"
@@ -28,7 +29,16 @@ func NewAPIServer(addr string, db *sql.DB) *APIServer {
 }
 
 func (s *APIServer) Run() error {
+	// Create uploads directory if it doesn't exist
+	if err := os.MkdirAll("./uploads", 0755); err != nil {
+		log.Fatal("Failed to create uploads directory:", err)
+	}
+
 	router := mux.NewRouter()
+	
+	// Serve static files from uploads directory (add this BEFORE subrouter)
+	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
+	
 	subrouter := router.PathPrefix("/api/v1").Subrouter()
 
 	// User routes
@@ -53,6 +63,14 @@ func (s *APIServer) Run() error {
 
 	// Payment routes with Pasis integration
 	paymentStore := payments.NewStore(s.db)
+
+	log.Printf("DEBUG: PasisAppKey loaded: %v (length: %d)", 
+    config.Envs.PasisAppKey != "", 
+    len(config.Envs.PasisAppKey))
+log.Printf("DEBUG: PasisSecretKey loaded: %v (length: %d)", 
+    config.Envs.PasisSecretKey != "", 
+    len(config.Envs.PasisSecretKey))
+	
 	pasisClient := payments.NewPasisClient(
 		config.Envs.PasisAppKey,
 		config.Envs.PasisSecretKey,
@@ -60,7 +78,7 @@ func (s *APIServer) Run() error {
 	paymentHandler := payments.NewHandler(paymentStore, pasisClient)
 	paymentHandler.RegisterRoutes(subrouter)
 
-	// Configure CORS - Allow all origins
+	// Configure CORS
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -72,5 +90,6 @@ func (s *APIServer) Run() error {
 	handler := c.Handler(router)
 
 	log.Println("Listen on", s.addr)
+	log.Println("Serving static files from ./uploads")
 	return http.ListenAndServe(s.addr, handler)
 }
