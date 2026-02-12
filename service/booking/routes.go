@@ -92,17 +92,18 @@ func(h *Handler)handleCreateBookings(w http.ResponseWriter, r *http.Request){
         Currency:      payload.Currency,
     }
 
-    _, err = h.store.CreateBooking(bking)
-    if err != nil {
-        utils.WriteError(w, http.StatusInternalServerError, err)
-        return
-    }
-	response := map[string] interface{}{
+   // Create booking and get updated booking with ID
+createdBooking, err := h.store.CreateBooking(bking)
+if err != nil {
+	utils.WriteError(w, http.StatusInternalServerError, err)
+	return
+}
 
-		"message" : "Booking initiated successfull",
-		"booking" : bking,
+response := map[string]interface{}{
+	"message": "Booking initiated successfully",
+	"booking": createdBooking, // <-- use the booking with the ID
+}
 
-	}
+utils.WriteJson(w, http.StatusCreated, response)
 
-	utils.WriteJson(w, http.StatusCreated, response)
 }

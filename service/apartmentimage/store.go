@@ -2,7 +2,7 @@ package apartmentimage
 
 import (
 	"database/sql"
-	
+	"fmt"
 
 	"github.com/go-refresh-practice/go-refresh-course/types"
 )
@@ -114,6 +114,34 @@ func (s *Store) GetAllImages() ([]types.ApartmentImage, error) {
 
     return images, nil
 }
+
+
+// DeleteApartmentImage deletes an image by ID and returns the deleted record
+func (s *Store) DeleteApartmentImage(imageID int) (types.ApartmentImage, error) {
+	var img types.ApartmentImage
+
+	// First, get the image info to know the file path
+	err := s.db.QueryRow(`
+        SELECT id, apartment_id, image_url, caption, created_at
+        FROM apartment_images
+        WHERE id = $1
+    `, imageID).Scan(&img.ID, &img.ApartmentID, &img.ImageURL, &img.Caption, &img.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return types.ApartmentImage{}, fmt.Errorf("image not found")
+		}
+		return types.ApartmentImage{}, err
+	}
+
+	// Delete from DB
+	_, err = s.db.Exec(`DELETE FROM apartment_images WHERE id = $1`, imageID)
+	if err != nil {
+		return types.ApartmentImage{}, err
+	}
+
+	return img, nil
+}
+
 
 
 // ----------------------------------------------------

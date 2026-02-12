@@ -42,7 +42,7 @@ func initConfig() Config {
 		DBPassword:             getEnv("DB_PASSWORD", ""),
 		DBHost:                 dbHost,
 		DBPort:                 dbPort,
-		DBAddress:              fmt.Sprintf("%s:%s", dbHost, dbPort), // Combine for backward compatibility
+		DBAddress:              fmt.Sprintf("%s:%s", dbHost, dbPort), 
 		DBName:                 getEnv("DB_NAME", "apartmentdb"),
 		JWTExpirationInSeconds: getEnvAsInt("JWT_EXPIRATION_IN_SECONDS", 3600*24*7),
 		JWTSecret:              getEnv("JWT_SECRET", "not-so-secret-now-is-it?"),

@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -24,131 +26,169 @@ func NewHandler(store types.ApartmentImagesStore) *Handler {
 }
 
 func (h *Handler) RegisterImageRoutes(router *mux.Router) {
+	// GET all images (auth required)
+	router.Handle("/apartment-images",
+		middleware.AuthMiddleware(http.HandlerFunc(h.handleGetApartmentImages)),
+	).Methods(http.MethodGet)
 
-    // GET all images (auth required)
-    router.Handle("/apartment-images",
-        middleware.AuthMiddleware(http.HandlerFunc(h.handleGetApartmentImages)),
-    ).Methods(http.MethodGet)
+	// POST image (admin only)
+	router.Handle("/apartment-images",
+		middleware.AuthMiddleware(middleware.AdminOnly(
+			http.HandlerFunc(h.handleAddApartmentImage),
+		)),
+	).Methods(http.MethodPost)
 
-    // POST image (admin only)
-    router.Handle("/apartment-images",
-        middleware.AuthMiddleware(middleware.AdminOnly(
-            http.HandlerFunc(h.handleAddApartmentImage),
-        )),
-    ).Methods(http.MethodPost)
+	// Serve uploads from Fly.io volume
+	router.PathPrefix("/uploads/").Handler(
+		http.StripPrefix("/uploads/", http.FileServer(http.Dir("/root/uploads"))),
+	)
+
+
+    router.Handle("/apartment-images/{id}",
+	middleware.AuthMiddleware(middleware.AdminOnly(
+		http.HandlerFunc(h.handleDeleteApartmentImage),
+	)),
+).Methods(http.MethodDelete)
 }
-
 
 // ----------------------------------------------------
 // GET images for apartment
 // ----------------------------------------------------
-
 func (h *Handler) handleGetApartmentImages(w http.ResponseWriter, r *http.Request) {
-    // Optional query param for future filtering
-    apartmentIDStr := r.URL.Query().Get("apartmentId")
+	apartmentIDStr := r.URL.Query().Get("apartmentId")
 
-    var images []types.ApartmentImage
-    var err error
+	var images []types.ApartmentImage
+	var err error
 
-    if apartmentIDStr == "" {
-        // Get all images
-        images, err = h.store.GetAllImages()
-    } else {
-        // Future: filter by apartmentId
-        apartmentID, convErr := strconv.Atoi(apartmentIDStr)
-        if convErr != nil {
-            utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId must be an integer"))
-            return
-        }
-        images, err = h.store.GetImagesByApartmentID(apartmentID)
-    }
+	if apartmentIDStr == "" {
+		images, err = h.store.GetAllImages()
+	} else {
+		apartmentID, convErr := strconv.Atoi(apartmentIDStr)
+		if convErr != nil {
+			utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId must be an integer"))
+			return
+		}
+		images, err = h.store.GetImagesByApartmentID(apartmentID)
+	}
 
-    if err != nil {
-        utils.WriteError(w, http.StatusInternalServerError, err)
-        return
-    }
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-    utils.WriteJson(w, http.StatusOK, images)
+	utils.WriteJson(w, http.StatusOK, images)
 }
-
-
 
 // ----------------------------------------------------
 // POST add image to apartment
 // ----------------------------------------------------
-
 func (h *Handler) handleAddApartmentImage(w http.ResponseWriter, r *http.Request) {
-    // Parse multipart form
-    if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB max
-        utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid form data"))
-        return
-    }
+	// Parse multipart form
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB max
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid form data"))
+		return
+	}
 
-    // Get apartment ID
-    apartmentIDStr := r.FormValue("apartmentId")
-    apartmentIDStr = strings.TrimSpace(apartmentIDStr)
-    
-    if apartmentIDStr == "" {
-        utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId is required"))
-        return
-    }
-    
-    apartmentID, err := strconv.Atoi(apartmentIDStr)
-    if err != nil {
-        utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId must be an integer"))
-        return
-    }
+	// Get apartment ID
+	apartmentIDStr := strings.TrimSpace(r.FormValue("apartmentId"))
+	if apartmentIDStr == "" {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId is required"))
+		return
+	}
+	apartmentID, err := strconv.Atoi(apartmentIDStr)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId must be an integer"))
+		return
+	}
 
-    // Get file from form-data
-    file, header, err := r.FormFile("imageFile")
-    if err != nil {
-        utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("image file is required"))
-        return
-    }
-    defer file.Close()
+	// Get file from form-data
+	file, header, err := r.FormFile("imageFile")
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("image file is required"))
+		return
+	}
+	defer file.Close()
 
-    // Get caption
-    caption := r.FormValue("caption")
-    if caption == "" {
-        utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("caption is required"))
-        return
-    }
+	// Get caption
+	caption := r.FormValue("caption")
+	if caption == "" {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("caption is required"))
+		return
+	}
 
-    // Sanitize filename - replace spaces and special characters with underscores
-    sanitizedFilename := strings.ReplaceAll(header.Filename, " ", "_")
-    sanitizedFilename = strings.ReplaceAll(sanitizedFilename, "%", "")
-    
-    // Add timestamp to make filename unique and avoid conflicts
-    timestamp := time.Now().Unix()
-    sanitizedFilename = fmt.Sprintf("%d_%s", timestamp, sanitizedFilename)
+	// Sanitize filename (remove unsafe characters)
+	re := regexp.MustCompile(`[^a-zA-Z0-9_.-]`)
+	sanitized := re.ReplaceAllString(header.Filename, "_")
+	sanitized = strings.ToLower(sanitized)
 
-    // Save file locally
-    dst := "./uploads/" + sanitizedFilename
-    out, err := os.Create(dst)
-    if err != nil {
-        utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("unable to save file"))
-        return
-    }
-    defer out.Close()
+	// Add timestamp to make filename unique
+	timestamp := time.Now().Unix()
+	sanitizedFilename := fmt.Sprintf("%d_%s", timestamp, sanitized)
 
-    _, err = io.Copy(out, file)
-    if err != nil {
-        utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("unable to save file"))
-        return
-    }
+	// Save to Fly.io volume
+	dst := filepath.Join("/root/uploads", sanitizedFilename)
+	out, err := os.Create(dst)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("unable to save file"))
+		return
+	}
+	defer out.Close()
 
-    // Save in database with sanitized filename
-    img := types.ApartmentImage{
-        ApartmentID: apartmentID,
-        ImageURL:    "/uploads/" + sanitizedFilename,
-        Caption:     caption,
-    }
+	_, err = io.Copy(out, file)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("unable to save file"))
+		return
+	}
 
-    newImage, err := h.store.CreateApartmentImage(img)
-    if err != nil {
-        utils.WriteError(w, http.StatusInternalServerError, err)
-        return
-    }
+	// Construct frontend-accessible URL
+	fullURL := fmt.Sprintf("https://%s/uploads/%s", os.Getenv("FLY_APP_NAME")+".fly.dev", sanitizedFilename)
 
-    utils.WriteJson(w, http.StatusCreated, newImage)
+	// Save in database
+	img := types.ApartmentImage{
+		ApartmentID: apartmentID,
+		ImageURL:    fullURL,
+		Caption:     caption,
+	}
+
+	newImage, err := h.store.CreateApartmentImage(img)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.WriteJson(w, http.StatusCreated, newImage)
 }
+
+
+
+func (h *Handler) handleDeleteApartmentImage(w http.ResponseWriter, r *http.Request) {
+	// Get image ID from URL
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	imageID, err := strconv.Atoi(idStr)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid image ID"))
+		return
+	}
+
+	// Delete from DB
+	img, err := h.store.DeleteApartmentImage(imageID)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Remove file from Fly.io volume
+	if img.ImageURL != "" {
+		// Extract filename from URL
+		filename := filepath.Base(img.ImageURL)
+		filepath := filepath.Join("/root/uploads", filename)
+		_ = os.Remove(filepath) // ignore error if file already missing
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message": "Image deleted successfully",
+		"image":   img,
+	})
+}
+
