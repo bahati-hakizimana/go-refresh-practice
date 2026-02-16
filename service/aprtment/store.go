@@ -15,70 +15,105 @@ func NewStore(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
-func (s *Store) GetApartments() ([]types.Apartment, error) {
-	rows, err := s.db.Query("SELECT id, code, name, rooms, description, price, status, created_at FROM apartments")
+// GetPublicApartments returns only available apartments for public viewing
+func (s *Store) GetPublicApartments() ([]types.Apartment, error) {
+	rows, err := s.db.Query(`
+		SELECT id, code, name, rooms, description, price, status, created_at 
+		FROM apartments 
+		WHERE status = 'available'
+		ORDER BY created_at DESC
+	`)
 	if err != nil {
-		return  nil, err
+		return nil, err
 	}
+	defer rows.Close()
 
 	apartments := make([]types.Apartment, 0)
 	for rows.Next() {
-		apt, err:= scanRowsIntoApartment(rows)
+		apt, err := scanRowsIntoApartment(rows)
 		if err != nil {
 			return nil, err
 		}
-
 		apartments = append(apartments, *apt)
 	}
 
 	return apartments, nil
 }
 
-func(s *Store) GetApartmentByCode(code string) (*types.Apartment, error){
-	rows, err := s.db.Query("SELECT id, code, name, rooms, description, price, status, created_at FROM apartments WHERE code = $1", code)
+// GetApartments returns all apartments (admin view)
+func (s *Store) GetApartments() ([]types.Apartment, error) {
+	rows, err := s.db.Query(`
+		SELECT id, code, name, rooms, description, price, status, created_at 
+		FROM apartments
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	apartments := make([]types.Apartment, 0)
+	for rows.Next() {
+		apt, err := scanRowsIntoApartment(rows)
+		if err != nil {
+			return nil, err
+		}
+		apartments = append(apartments, *apt)
+	}
+
+	return apartments, nil
+}
+
+func (s *Store) GetApartmentByCode(code string) (*types.Apartment, error) {
+	rows, err := s.db.Query(`
+		SELECT id, code, name, rooms, description, price, status, created_at 
+		FROM apartments 
+		WHERE code = $1
+	`, code)
 
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	apt := new(types.Apartment)
-	for rows.Next(){
+	for rows.Next() {
 		apt, err = scanRowsIntoApartment(rows)
-
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if apt.ID == 0 {
-		return  nil, fmt.Errorf("Apartment not found")
+		return nil, fmt.Errorf("Apartment not found")
 	}
 
 	return apt, nil
 }
 
-
-
 func (s *Store) CreateApartment(ap types.Apartment) (types.Apartment, error) {
-    // Insert into Postgres and return the generated ID
-    err := s.db.QueryRow(`
-        INSERT INTO apartments (code, name, rooms, description, price)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id
-    `, ap.Code, ap.Name, ap.Rooms, ap.Description, ap.Price).Scan(&ap.ID)
+	err := s.db.QueryRow(`
+		INSERT INTO apartments (code, name, rooms, description, price)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id
+	`, ap.Code, ap.Name, ap.Rooms, ap.Description, ap.Price).Scan(&ap.ID)
 
-    if err != nil {
-        return types.Apartment{}, err
-    }
+	if err != nil {
+		return types.Apartment{}, err
+	}
 
-    return ap, nil
+	return ap, nil
 }
 
-func scanRowsIntoApartment(rows *sql.Rows) (*types.Apartment, error) {
-	apartment := new(types.Apartment)
+func (s *Store) DeleteApartment(id int) (types.Apartment, error) {
+	var apartment types.Apartment
 
-	err := rows.Scan(
-
+	// First, get the apartment info before deleting
+	err := s.db.QueryRow(`
+		SELECT id, code, name, rooms, description, price, status, created_at
+		FROM apartments
+		WHERE id = $1
+	`, id).Scan(
 		&apartment.ID,
 		&apartment.Code,
 		&apartment.Name,
@@ -87,14 +122,41 @@ func scanRowsIntoApartment(rows *sql.Rows) (*types.Apartment, error) {
 		&apartment.Price,
 		&apartment.Status,
 		&apartment.CreatedAt,
+	)
 
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return types.Apartment{}, fmt.Errorf("apartment not found")
+		}
+		return types.Apartment{}, err
+	}
+
+	// Delete the apartment
+	_, err = s.db.Exec(`DELETE FROM apartments WHERE id = $1`, id)
+	if err != nil {
+		return types.Apartment{}, err
+	}
+
+	return apartment, nil
+}
+
+func scanRowsIntoApartment(rows *sql.Rows) (*types.Apartment, error) {
+	apartment := new(types.Apartment)
+
+	err := rows.Scan(
+		&apartment.ID,
+		&apartment.Code,
+		&apartment.Name,
+		&apartment.Rooms,
+		&apartment.Description,
+		&apartment.Price,
+		&apartment.Status,
+		&apartment.CreatedAt,
 	)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return  apartment, nil
+	return apartment, nil
 }
-
-

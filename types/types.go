@@ -6,6 +6,8 @@ type ApartmentStore interface {
 	GetApartments() ([]Apartment, error)
 	GetApartmentByCode(code string) (*Apartment, error)
 	CreateApartment(apartment Apartment) (Apartment, error)
+	GetPublicApartments() ([]Apartment, error)
+	DeleteApartment(id int) (Apartment, error)
 }
 
 type Apartment struct {

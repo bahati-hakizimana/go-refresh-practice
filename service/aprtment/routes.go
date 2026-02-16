@@ -4,6 +4,7 @@ import (
 	// "encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/go-refresh-practice/go-refresh-course/middleware"
@@ -12,9 +13,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-
 type Handler struct {
-
 	store types.ApartmentStore
 }
 
@@ -23,7 +22,10 @@ func NewHandler(store types.ApartmentStore) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router *mux.Router) {
-	// GET /apartments 
+	// GET /apartments/public - Public endpoint (no auth required)
+	router.HandleFunc("/apartments/public", h.handleGetApartmentsPublic).Methods(http.MethodGet)
+
+	// GET /apartments - Protected endpoint (auth required)
 	router.Handle("/apartments",
 		middleware.AuthMiddleware(http.HandlerFunc(h.handleGetApartments)),
 	).Methods(http.MethodGet)
@@ -32,22 +34,36 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	router.Handle("/apartments",
 		middleware.AuthMiddleware(middleware.AdminOnly(http.HandlerFunc(h.handlerCreateApartment))),
 	).Methods(http.MethodPost)
+
+	// DELETE /apartments/{id} (admin only)
+	router.Handle("/apartments/{id}",
+		middleware.AuthMiddleware(middleware.AdminOnly(http.HandlerFunc(h.handleDeleteApartment))),
+	).Methods(http.MethodDelete)
 }
 
-func(h *Handler) handleGetApartments(w http.ResponseWriter, r *http.Request){
+// Public endpoint - no authentication required
+func (h *Handler) handleGetApartmentsPublic(w http.ResponseWriter, r *http.Request) {
+	apartments, err := h.store.GetPublicApartments()
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
 
+	utils.WriteJson(w, http.StatusOK, apartments)
+}
+
+// Protected endpoint - authentication required
+func (h *Handler) handleGetApartments(w http.ResponseWriter, r *http.Request) {
 	ap, err := h.store.GetApartments()
-  if err != nil {
-	utils.WriteError(w, http.StatusInternalServerError, err)
-	return
-  }
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-  utils.WriteJson(w, http.StatusOK, ap)
+	utils.WriteJson(w, http.StatusOK, ap)
 }
 
 func (h *Handler) handlerCreateApartment(w http.ResponseWriter, r *http.Request) {
-
-	
 	var payload types.CreateApartmentPayload
 	if err := utils.PulseJson(r, &payload); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, err)
@@ -68,34 +84,54 @@ func (h *Handler) handlerCreateApartment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-
 	// Create apartment
-
 	aptment := types.Apartment{
 		Name:        payload.Name,
-		Code:       payload.Code,
-		Rooms:      payload.Rooms,
+		Code:        payload.Code,
+		Rooms:       payload.Rooms,
 		Description: payload.Description,
-		Price:      payload.Price,
+		Price:       payload.Price,
 	}
 
-	_,err = h.store.CreateApartment(aptment)
+	_, err = h.store.CreateApartment(aptment)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	response := map[string]interface{}{
-		"message" : "Apartment created successfully",
-		"name": aptment.Name,
-		"code": aptment.Code,
-		"rooms": aptment.Rooms,
+		"message":     "Apartment created successfully",
+		"name":        aptment.Name,
+		"code":        aptment.Code,
+		"rooms":       aptment.Rooms,
 		"description": aptment.Description,
-		"price": aptment.Price,
-		"status": aptment.Status,
-		"createdAt": aptment.CreatedAt,
+		"price":       aptment.Price,
+		"status":      aptment.Status,
+		"createdAt":   aptment.CreatedAt,
 	}
 
 	utils.WriteJson(w, http.StatusCreated, response)
+}
 
+func (h *Handler) handleDeleteApartment(w http.ResponseWriter, r *http.Request) {
+	// Get apartment ID from URL
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	apartmentID, err := strconv.Atoi(idStr)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid apartment ID"))
+		return
+	}
+
+	// Delete apartment from database
+	apartment, err := h.store.DeleteApartment(apartmentID)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"message":   "Apartment deleted successfully",
+		"apartment": apartment,
+	})
 }

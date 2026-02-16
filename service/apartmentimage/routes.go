@@ -26,6 +26,9 @@ func NewHandler(store types.ApartmentImagesStore) *Handler {
 }
 
 func (h *Handler) RegisterImageRoutes(router *mux.Router) {
+	// GET all images PUBLIC (no auth required)
+	router.HandleFunc("/apartment-images/public", h.handleGetApartmentImagesPublic).Methods(http.MethodGet)
+
 	// GET all images (auth required)
 	router.Handle("/apartment-images",
 		middleware.AuthMiddleware(http.HandlerFunc(h.handleGetApartmentImages)),
@@ -38,21 +41,49 @@ func (h *Handler) RegisterImageRoutes(router *mux.Router) {
 		)),
 	).Methods(http.MethodPost)
 
+	// DELETE image (admin only)
+	router.Handle("/apartment-images/{id}",
+		middleware.AuthMiddleware(middleware.AdminOnly(
+			http.HandlerFunc(h.handleDeleteApartmentImage),
+		)),
+	).Methods(http.MethodDelete)
+
 	// Serve uploads from Fly.io volume
 	router.PathPrefix("/uploads/").Handler(
 		http.StripPrefix("/uploads/", http.FileServer(http.Dir("/root/uploads"))),
 	)
-
-
-    router.Handle("/apartment-images/{id}",
-	middleware.AuthMiddleware(middleware.AdminOnly(
-		http.HandlerFunc(h.handleDeleteApartmentImage),
-	)),
-).Methods(http.MethodDelete)
 }
 
 // ----------------------------------------------------
-// GET images for apartment
+// GET images PUBLIC (no authentication)
+// ----------------------------------------------------
+func (h *Handler) handleGetApartmentImagesPublic(w http.ResponseWriter, r *http.Request) {
+	apartmentIDStr := r.URL.Query().Get("apartmentId")
+
+	var images []types.ApartmentImage
+	var err error
+
+	if apartmentIDStr == "" {
+		images, err = h.store.GetAllImages()
+	} else {
+		apartmentID, convErr := strconv.Atoi(apartmentIDStr)
+		if convErr != nil {
+			utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("apartmentId must be an integer"))
+			return
+		}
+		images, err = h.store.GetImagesByApartmentID(apartmentID)
+	}
+
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.WriteJson(w, http.StatusOK, images)
+}
+
+// ----------------------------------------------------
+// GET images for apartment (protected)
 // ----------------------------------------------------
 func (h *Handler) handleGetApartmentImages(w http.ResponseWriter, r *http.Request) {
 	apartmentIDStr := r.URL.Query().Get("apartmentId")
@@ -159,8 +190,6 @@ func (h *Handler) handleAddApartmentImage(w http.ResponseWriter, r *http.Request
 	utils.WriteJson(w, http.StatusCreated, newImage)
 }
 
-
-
 func (h *Handler) handleDeleteApartmentImage(w http.ResponseWriter, r *http.Request) {
 	// Get image ID from URL
 	vars := mux.Vars(r)
@@ -191,4 +220,3 @@ func (h *Handler) handleDeleteApartmentImage(w http.ResponseWriter, r *http.Requ
 		"image":   img,
 	})
 }
-
