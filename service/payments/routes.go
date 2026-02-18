@@ -40,9 +40,9 @@ type CreatePaymentRequest struct {
 	BookingID     int    `json:"booking_id"`
 	Amount        string `json:"amount"`
 	Currency      string `json:"currency"`
-	PaymentMethod string `json:"payment_method"` // e.g., "mobile_money", "card", "bank_transfer"
+	PaymentMethod string `json:"payment_method"` 
 	PhoneNumber   string `json:"phone_number"`
-	Region        string `json:"region"` // e.g., "RW", "US"
+	Region        string `json:"region"` 
 }
 
 func (h *Handler) handleCreatePayment(w http.ResponseWriter, r *http.Request) {
@@ -101,12 +101,12 @@ func (h *Handler) handleCreatePayment(w http.ResponseWriter, r *http.Request) {
 	payment := types.Payment{
 		BookingID:            req.BookingID,
 		PaymentType:          "deposit",
-		Amount:               amount,                // Now a float64
+		Amount:               amount,                
 		Currency:             req.Currency,
-		PaymentStatus:        transaction.Status,    // "pending", "completed", "failed"
+		PaymentStatus:        transaction.Status,    
 		PaymentMethod:        req.PaymentMethod,
 		TransactionReference: transaction.ID,
-		PaidAt:               time.Time{},           // Zero time.Time (will be updated when confirmed)
+		PaidAt:               time.Time{},           
 	}
 
 	createdPayment, err := h.store.CreatePayment(payment)
@@ -122,7 +122,7 @@ func (h *Handler) handleCreatePayment(w http.ResponseWriter, r *http.Request) {
 		"message":     "Payment initiated successfully",
 	}
 
-	utils.WriteJson(w, http.StatusCreated, response)  // Fixed: WriteJson not WriteJSON
+	utils.WriteJson(w, http.StatusCreated, response)  
 }
 
 /* ------------------ GET ALL PAYMENTS --------------------- */

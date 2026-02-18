@@ -6,6 +6,8 @@ type ApartmentStore interface {
 	GetApartments() ([]Apartment, error)
 	GetApartmentByCode(code string) (*Apartment, error)
 	CreateApartment(apartment Apartment) (Apartment, error)
+	GetApartmentByID(id int) (*Apartment, error) 
+	UpdateApartment(id int, payload UpdateApartmentPayload) (Apartment, error)
 	GetPublicApartments() ([]Apartment, error)
 	DeleteApartment(id int) (Apartment, error)
 }
@@ -29,11 +31,31 @@ type CreateApartmentPayload struct {
 	Price       float64 `json:"price" validate:"required,gt=0"`
 }
 
+// UpdateApartmentPayload - for PATCH /apartments/{id}
+type UpdateApartmentPayload struct {
+	Name        string  `json:"name"        validate:"omitempty"`
+	Rooms       int     `json:"rooms"       validate:"omitempty,min=1"`
+	Description string  `json:"description" validate:"omitempty"`
+	Price       float64 `json:"price"       validate:"omitempty,gt=0"`
+	Status      string  `json:"status"      validate:"omitempty,oneof=available unavailable maintenance"`
+}
+
+// GetApartmentRequest - path params for GET /apartments/{id}
+type GetApartmentRequest struct {
+	ID int `json:"id" validate:"required,gt=0"`
+}
+
+// ApartmentResponse - unified response wrapper
+type ApartmentResponse struct {
+	Message   string    `json:"message"`
+	Apartment Apartment `json:"apartment"`
+}
+
 type ApartmentImagesStore interface {
 	GetAllImages() ([]ApartmentImage, error)
 	GetImagesByApartmentID(apartmentID int) ([]ApartmentImage, error)
 	CreateApartmentImage(image ApartmentImage) (ApartmentImage, error)
-	DeleteApartmentImage(imageID int) (ApartmentImage, error) // declare only
+	DeleteApartmentImage(imageID int) (ApartmentImage, error) 
 }
 
 
