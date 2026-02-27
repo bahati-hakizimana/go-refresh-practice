@@ -382,8 +382,8 @@ const getApartmentByIDQuery = `
  `
 const createApartmentQuery = ` 
   INSERT INTO apartments (code, name, rooms, description, price)
-  VALUES (S1, $2, $3, $4, $5)
-  RETURNING id, code, name, rooms, decsription, price, status, created_at
+  VALUES ($1, $2, $3, $4, $5)
+  RETURNING id, code, name, rooms, description, price, status, created_at
  `
 
  const deleteApartmentQuery = ` 
