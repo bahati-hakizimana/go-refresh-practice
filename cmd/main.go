@@ -10,6 +10,9 @@ import (
 	"github.com/go-refresh-practice/go-refresh-course/config"
 	"github.com/go-refresh-practice/go-refresh-course/db"
 	"github.com/go-refresh-practice/go-refresh-course/service/seed"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -38,6 +41,7 @@ func main() {
 	}
 
 	initStorage(dbConn)
+	runMigrations(dbConn)
 
 	seed.SeedAdmin(dbConn)
 
@@ -54,4 +58,27 @@ func initStorage(db *sql.DB) {
 	}
 
 	log.Printf("DB: Successfully connected !!")
+}
+
+
+func runMigrations(dbConn *sql.DB) {
+	driver, err := postgres.WithInstance(dbConn, &postgres.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://cmd/migrate/migrations",
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal(err)
+	}
+
+	log.Println("✅ Database migrations up to date")
 }

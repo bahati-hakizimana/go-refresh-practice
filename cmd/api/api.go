@@ -10,6 +10,7 @@ import (
 	"github.com/go-refresh-practice/go-refresh-course/service/apartmentimage"
 	"github.com/go-refresh-practice/go-refresh-course/service/aprtment"
 	"github.com/go-refresh-practice/go-refresh-course/service/booking"
+	"github.com/go-refresh-practice/go-refresh-course/service/comment"
 	"github.com/go-refresh-practice/go-refresh-course/service/payments"
 	"github.com/go-refresh-practice/go-refresh-course/service/user"
 	"github.com/gorilla/mux"
@@ -60,6 +61,10 @@ func (s *APIServer) Run() error {
 	bookingStore := booking.NewStore(s.db)
 	bookingHandler := booking.NewHandler(bookingStore)
 	bookingHandler.RegisterRoutes(subrouter)
+
+	commentStore := comment.NewStore(s.db)
+	commentHandler := comment.NewHandler(commentStore)
+	commentHandler.RegisterRoutes(subrouter)
 
 	// Payment routes with Pasis integration
 	paymentStore := payments.NewStore(s.db)

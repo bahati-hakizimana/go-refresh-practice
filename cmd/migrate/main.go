@@ -17,10 +17,8 @@ import (
 
 func main() {
 
-	// PRIORITY 1: Check for DATABASE_URL (Fly.io sets this automatically)
 	dsn := os.Getenv("DATABASE_URL")
-	
-	// PRIORITY 2: Fallback to building DSN from config (local development)
+
 	if dsn == "" {
 		dsn = fmt.Sprintf(
 			"postgres://%s:%s@%s/%s?sslmode=disable",
@@ -31,21 +29,16 @@ func main() {
 		)
 	}
 
-	log.Println("Connecting to database for migrations...")
-
-	// Connect using existing helper
 	dbConn, err := db.NewPostgresStorage(dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Migration driver for Postgres
 	driver, err := postgres.WithInstance(dbConn, &postgres.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Create migration instance
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://cmd/migrate/migrations",
 		"postgres",
@@ -55,20 +48,26 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// "up" or "down" command
-	cmd := os.Args[len(os.Args)-1]
+	if len(os.Args) < 2 {
+		log.Fatal("Specify 'up' or 'down'")
+	}
 
-	if cmd == "up" {
+	cmd := os.Args[1]
+
+	switch cmd {
+	case "up":
 		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 			log.Fatal(err)
 		}
 		log.Println("✅ Migrations applied successfully!")
-	}
 
-	if cmd == "down" {
+	case "down":
 		if err := m.Down(); err != nil && err != migrate.ErrNoChange {
 			log.Fatal(err)
 		}
 		log.Println("✅ Migrations rolled back successfully!")
+
+	default:
+		log.Fatal("Unknown command. Use 'up' or 'down'")
 	}
 }

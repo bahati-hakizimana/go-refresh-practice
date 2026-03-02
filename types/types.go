@@ -99,6 +99,7 @@ type Booking struct {
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
+
 // BookingPayload is used for incoming booking requests
 type BookingPayload struct {
 	ApartmentID   int     `json:"apartment_id" validate:"required,gt=0"`
@@ -113,6 +114,25 @@ type BookingPayload struct {
 	BookingAmount float64 `json:"bookingAmount" validate:"required,gt=0"`
 	BalanceAmount float64 `json:"balanceAmount" validate:"required,gte=0"`
 	Currency      string  `json:"currency" validate:"omitempty"`
+}
+
+
+type CommentStore interface {
+	GetComments() ([]Comment, error)
+	GetCommentByID(id int) (*Comment, error)
+	CreateComment(comment Comment) (Comment, error)
+}
+
+type Comment struct {
+	ID 		int		 	`json:"id"`
+	Name	string		`json:"name"`
+	Comment string      `json:"comment"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type CommentPayload struct {
+	Name     string    `json:"name" validate:"required"`
+	Comment  string    `json:"comment" validate:"required"`
 }
 
 // payment struct and interface
