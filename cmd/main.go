@@ -45,10 +45,19 @@ func main() {
 
 	seed.SeedAdmin(dbConn)
 
-	server := api.NewAPIServer(":8080", dbConn)
-	if err := server.Run(); err != nil {
-		log.Fatal(err)
-	}
+	port := os.Getenv("PORT")
+if port == "" {
+	port = "8080"
+}
+
+addr := "0.0.0.0:" + port
+
+log.Printf("Server running on %s", addr)
+
+server := api.NewAPIServer(addr, dbConn)
+if err := server.Run(); err != nil {
+	log.Fatal(err)
+}
 }
 
 func initStorage(db *sql.DB) {
@@ -67,11 +76,11 @@ func runMigrations(dbConn *sql.DB) {
 		log.Fatal(err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://cmd/migrate/migrations",
-		"postgres",
-		driver,
-	)
+m, err := migrate.NewWithDatabaseInstance(
+	"file://migrations",
+	"postgres",
+	driver,
+)
 	if err != nil {
 		log.Fatal(err)
 	}

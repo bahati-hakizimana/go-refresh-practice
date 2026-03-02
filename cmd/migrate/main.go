@@ -40,10 +40,10 @@ func main() {
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://cmd/migrate/migrations",
-		"postgres",
-		driver,
-	)
+	"file://migrations",
+	"postgres",
+	driver,
+)
 	if err != nil {
 		log.Fatal(err)
 	}

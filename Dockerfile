@@ -18,7 +18,11 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /root
 
+# Copy binary
 COPY --from=builder /app/main .
+
+# 🔥 COPY MIGRATIONS (THIS WAS MISSING)
+COPY --from=builder /app/cmd/migrate/migrations ./migrations
 
 # Create uploads directory (volume will mount here)
 RUN mkdir -p /root/uploads
