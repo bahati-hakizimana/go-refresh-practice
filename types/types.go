@@ -121,6 +121,7 @@ type CommentStore interface {
 	GetComments() ([]Comment, error)
 	GetCommentByID(id int) (*Comment, error)
 	CreateComment(comment Comment) (Comment, error)
+	DeleteComment(id int) error 
 }
 
 type Comment struct {

@@ -39,6 +39,11 @@ const createCommentQuery = `
 	RETURNING id, created_at
 `
 
+const deleteCommentQuery = `
+	DELETE FROM comments
+	WHERE id = $1
+`
+
 //
 // =====================
 // Methods
@@ -108,4 +113,23 @@ func (s *Store) CreateComment(comment types.Comment) (types.Comment, error) {
 	}
 
 	return comment, nil
+}
+
+
+func (s *Store) DeleteComment(id int) error {
+	result, err := s.db.Exec(deleteCommentQuery, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete comment: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("comment not found")
+	}
+
+	return nil
 }
